@@ -1,0 +1,129 @@
+
+DROP TABLE IF EXISTS main_table;
+DROP TABLE IF EXISTS pool;
+
+
+CREATE TABLE main_table (
+    id   int PRIMARY KEY,
+    val  text
+);
+
+INSERT INTO main_table (id, val) VALUES
+(1,  'apple'),
+(2,  'banana'),
+(3,  'apple'),     -- дубль
+(4,  'cherry'),
+(5,  'banana'),    -- дубль
+(6,  'mango'),
+(7,  'grape'),
+(8,  'cherry'),    -- дубль
+(9,  'plum'),
+(10, 'kiwi'),
+(11, 'apple'),     -- дубль
+(12, 'melon'),
+(13, 'mango'),     -- дубль
+(14, 'grape'),     -- дубль
+(15, 'pear'),
+(16, 'banana'),    -- дубль
+(17, 'fig'),
+(18, 'plum'),      -- дубль
+(19, 'peach'),
+
+
+SELECT val, COUNT(*) AS cnt
+FROM main_table
+GROUP BY val
+HAVING COUNT(*) > 1
+ORDER BY cnt DESC;
+
+
+CREATE TABLE pool (
+    value text PRIMARY KEY
+);
+
+
+INSERT INTO pool (value) VALUES
+('banana'),
+('lemon'),
+('apple'),
+('apricot'),
+('grapefruit'),
+('mango'),
+('dragonfruit'),
+('plum'),
+('pear'),
+('blueberry'),
+('kiwi'),
+('strawberry'),
+('papaya'),
+('cherry'),
+('watermelon');
+
+
+SELECT * FROM pool ORDER BY value;
+ 
+
+
+
+
+
+BEGIN;
+WITH duplicates AS (
+  SELECT id
+  FROM (
+    SELECT id,
+           row_number() OVER (PARTITION BY val ORDER BY id) AS rn
+    FROM main_table
+    WHERE val IS NOT NULL
+  ) t
+  WHERE t.rn > 1
+)
+UPDATE main_table
+SET val = NULL
+WHERE id IN (SELECT id FROM duplicates);
+COMMIT;
+
+
+SELECT count(*) AS emptied_rows FROM main_table WHERE val IS NULL;
+
+SELECT * FROM main_table ORDER BY id;
+
+
+BEGIN;
+WITH avail AS (
+  SELECT value,
+         row_number() OVER (ORDER BY value) AS rn
+  FROM pool p
+  WHERE NOT EXISTS (SELECT 1 FROM main_table m WHERE m.val = p.value)
+),
+empties AS (
+  SELECT id,
+         row_number() OVER (ORDER BY id) AS rn
+  FROM main_table
+  WHERE val IS NULL
+),
+to_update AS (
+  SELECT e.id, a.value
+  FROM empties e
+  JOIN avail a ON e.rn = a.rn
+)
+UPDATE main_table m
+SET val = tu.value
+FROM to_update tu
+WHERE m.id = tu.id;
+COMMIT;
+
+
+SELECT count(*) AS empties_after FROM main_table WHERE val IS NULL;
+
+
+SELECT * FROM main_table ORDER BY id;
+
+
+SELECT val, COUNT(*) AS cnt, array_agg(id ORDER BY id) AS ids
+FROM main_table
+WHERE val IS NOT NULL
+GROUP BY val
+HAVING COUNT(*) > 1
+ORDER BY cnt DESC;
+

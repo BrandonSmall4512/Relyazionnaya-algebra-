@@ -1,0 +1,306 @@
+DROP SCHEMA IF EXISTS unik CASCADE;
+
+-- Создаем схему
+CREATE SCHEMA unik;
+
+-- Кафедры
+CREATE TABLE IF NOT EXISTS unik.kafedra (
+    kafedra_id SERIAL PRIMARY KEY,
+    kafedra_kod VARCHAR(6) NOT NULL UNIQUE,
+    kafedra_name VARCHAR(100) NOT NULL
+);
+
+-- Группы
+CREATE TABLE IF NOT EXISTS unik.gruppa(
+    gruppa_id SERIAL PRIMARY KEY,
+    gruppa_name VARCHAR(100) NOT NULL UNIQUE,
+    god_sozdania INTEGER NOT NULL,
+    kafedra_id INTEGER NOT NULL,
+    
+    CONSTRAINT fk_gruppa_kafedra FOREIGN KEY (kafedra_id)
+        REFERENCES unik.kafedra(kafedra_id) ON DELETE RESTRICT
+);
+
+-- Студенты
+CREATE TABLE IF NOT EXISTS unik.student (
+    student_id SERIAL PRIMARY KEY,
+    zachotka_number VARCHAR(50) NOT NULL UNIQUE,
+    student_name VARCHAR(255) NOT NULL,
+    tekushaya_gruppa_id INTEGER NOT NULL,
+    god_postuplenia INTEGER NOT NULL,
+    
+    CONSTRAINT fk_student_gruppa FOREIGN KEY (tekushaya_gruppa_id)
+        REFERENCES unik.gruppa(gruppa_id) ON DELETE RESTRICT,
+    CONSTRAINT chk_god_postuplenia CHECK (god_postuplenia BETWEEN 2000 AND 2030)
+);
+
+-- Дисциплины
+CREATE TABLE IF NOT EXISTS unik.predmet (
+    predmet_id SERIAL PRIMARY KEY,
+    predmet_name VARCHAR(255) NOT NULL UNIQUE,
+    kreditov INTEGER NOT NULL,
+    
+    CONSTRAINT chk_kreditov CHECK (kreditov BETWEEN 1 AND 10)
+);
+
+-- Типы контроля
+CREATE TABLE IF NOT EXISTS unik.tip_kontrolya (
+    tip_kontrolya_id SERIAL PRIMARY KEY,
+    tip_name VARCHAR(100) NOT NULL UNIQUE,
+    is_examen BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+-- Оценки
+CREATE TABLE IF NOT EXISTS unik.ocenka (
+    ocenka_id SERIAL PRIMARY KEY,
+    ocenka_symbol VARCHAR(5) NOT NULL UNIQUE,
+    ocenka_name VARCHAR(50) NOT NULL,
+    chislovoe_znachenie DECIMAL(3,1),
+    is_sdano BOOLEAN NOT NULL
+);
+
+-- Успеваемость
+CREATE TABLE IF NOT EXISTS unik.uspevaemost(
+    zapis_id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL,
+    predmet_id INTEGER NOT NULL,
+    tip_kontrolya_id INTEGER NOT NULL,
+    ocenka_id INTEGER NOT NULL,
+    gruppa_id INTEGER NOT NULL,
+    semestr_number INTEGER NOT NULL,
+    uchebny_god VARCHAR(9) NOT NULL,
+    data_sdachi DATE NOT NULL DEFAULT CURRENT_DATE,
+    
+    CONSTRAINT fk_uspevaemost_student FOREIGN KEY (student_id) 
+        REFERENCES unik.student(student_id) ON DELETE CASCADE,
+    CONSTRAINT fk_uspevaemost_predmet FOREIGN KEY (predmet_id) 
+        REFERENCES unik.predmet(predmet_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_uspevaemost_tip_kontrolya FOREIGN KEY (tip_kontrolya_id) 
+        REFERENCES unik.tip_kontrolya(tip_kontrolya_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_uspevaemost_ocenka FOREIGN KEY (ocenka_id) 
+        REFERENCES unik.ocenka(ocenka_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_uspevaemost_gruppa FOREIGN KEY (gruppa_id) 
+        REFERENCES unik.gruppa(gruppa_id) ON DELETE RESTRICT,
+    
+    CONSTRAINT uq_uspevaemost UNIQUE (student_id, predmet_id, tip_kontrolya_id, semestr_number, uchebny_god),
+    
+    CONSTRAINT chk_semestr_number CHECK (semestr_number BETWEEN 1 AND 8),
+    CONSTRAINT chk_uchebny_god CHECK (uchebny_god ~ '^\d{4}-\d{4}$')
+);
+
+-- Индексы
+CREATE INDEX IF NOT EXISTS idx_uspevaemost_student_id ON unik.uspevaemost(student_id);
+CREATE INDEX IF NOT EXISTS idx_uspevaemost_predmet_id ON unik.uspevaemost(predmet_id);
+CREATE INDEX IF NOT EXISTS idx_uspevaemost_gruppa_id ON unik.uspevaemost(gruppa_id);
+
+
+
+-- Кафедры
+INSERT INTO unik.kafedra (kafedra_kod, kafedra_name) VALUES
+('КЗ', 'Кафедра компьютерных наук'),
+('ИУ', 'Кафедра информационных систем'),
+('ФН', 'Кафедра фундаментальных наук'),
+('РК', 'Кафедра робототехники и комплексной автоматизации'),
+('Э', 'Кафедра энергетики');
+
+-- Группы по курсам
+INSERT INTO unik.gruppa (gruppa_name, god_sozdania, kafedra_id) VALUES
+-- 1 курс (2023 год поступления)
+('КЗ-21Б', 2023, 1), ('КЗ-22Б', 2023, 1),
+('ИУ-21Б', 2023, 2), ('ИУ-22Б', 2023, 2),
+('РК-21Б', 2023, 4), ('РК-22Б', 2023, 4),
+('ФН-21Б', 2023, 3),
+('Э-21Б', 2023, 5),
+
+-- 2 курс (2022 год поступления)  
+('КЗ-36Б', 2022, 1), ('КЗ-37Б', 2022, 1),
+('ИУ-36Б', 2022, 2), ('ИУ-37Б', 2022, 2),
+('РК-36Б', 2022, 4),
+
+-- 3 курс (2021 год поступления)
+('КЗ-56Б', 2021, 1), ('КЗ-57Б', 2021, 1),
+('ИУ-56Б', 2021, 2), ('ИУ-57Б', 2021, 2),
+('РК-56Б', 2021, 4),
+
+-- 4 курс (2020 год поступления)
+('КЗ-76Б', 2020, 1), ('КЗ-77Б', 2020, 1),
+('ИУ-76Б', 2020, 2), ('ИУ-77Б', 2020, 2);
+
+-- Предметы
+INSERT INTO unik.predmet (predmet_name, kreditov) VALUES
+-- Общие предметы
+('Математический анализ', 6),
+('Линейная алгебра', 5),
+('Физика', 5),
+('Иностранный язык', 3),
+('История', 2),
+('Философия', 2),
+
+-- Профильные предметы КЗ
+('Программирование', 5),
+('Операционные системы', 4),
+('Базы данных', 5),
+('WEB-программирование', 4),
+('Мобильная разработка', 4),
+('Искусственный интеллект', 5),
+('Компьютерные сети', 4),
+
+-- Профильные предметы ИУ
+('Схемотехника', 4),
+('Микропроцессорные системы', 5),
+('Сетевые технологии', 4),
+('Системы управления', 5),
+
+-- Профильные предметы РК
+('Теоретическая механика', 5),
+('Электротехника', 4),
+('Робототехника', 5),
+('Автоматизация производств', 4),
+
+-- Профильные предметы Э
+('Электроэнергетика', 5),
+('Теплотехника', 4),
+('Электропривод', 4);
+
+-- Типы контроля
+INSERT INTO unik.tip_kontrolya (tip_name, is_examen) VALUES
+('Экзамен', TRUE),
+('Зачет', FALSE),
+('Курсовая работа', FALSE),
+('Лабораторная работа', FALSE),
+('Дипломный проект', FALSE);
+
+-- Оценки (добавляем дефолтную "Не сдал")
+INSERT INTO unik.ocenka (ocenka_symbol, ocenka_name, chislovoe_znachenie, is_sdano) VALUES
+('5', 'Отлично', 5.0, TRUE),
+('4', 'Хорошо', 4.0, TRUE),
+('3', 'Удовлетворительно', 3.0, TRUE),
+('2', 'Неудовлетворительно', 2.0, FALSE),
+('Зач', 'Зачёт', NULL, TRUE),
+('Незач', 'Незачёт', NULL, FALSE),
+('Не сд', 'Не сдал', NULL, FALSE);  -- Дефолтная запись
+
+-- Студенты
+INSERT INTO unik.student (zachotka_number, student_name, tekushaya_gruppa_id, god_postuplenia) VALUES
+-- 1 курс КЗ (2023)
+('23мк101', 'Иванов Алексей Сергеевич', 1, 2023),
+('23мк102', 'Петрова Анна Романовна', 1, 2023),
+('23мк103', 'Сидоров Михаил Владимирович', 2, 2023),
+
+-- 1 курс ИУ (2023)
+('23мк201', 'Кузнецов Дмитрий Андреевич', 3, 2023),
+('23мк202', 'Новикова Елена Викторовна', 4, 2023),
+
+-- 1 курс РК (2023)
+('23мк301', 'Смирнов Артем Игоревич', 5, 2023),
+('23мк302', 'Федорова Мария Дмитриевна', 6, 2023),
+
+-- 1 курс ФН (2023)
+('23мк401', 'Морозов Иван Петрович', 7, 2023),
+
+-- 1 курс Э (2023)
+('23мк501', 'Токарев Андрей Викторович', 8, 2023),
+
+-- 2 курс КЗ (2022)
+('22мк121', 'Несмеянов Степан Алексеевич', 9, 2022),
+('22мк122', 'Козлова Эвелина Андреевна', 9, 2022),
+('22мк123', 'Волков Дмитрий Петрович', 10, 2022),
+
+-- 2 курс ИУ (2022)
+('22мк221', 'Орлова Екатерина Игоревна', 11, 2022),
+('22мк222', 'Николаев Павел Олегович', 12, 2022),
+
+-- 2 курс РК (2022)
+('22мк321', 'Громов Артур Дмитриевич', 13, 2022),
+
+-- 3 курс КЗ (2021)
+('21мк141', 'Зайцева Ольга Викторовна', 15, 2021),
+('21мк142', 'Белов Александр Сергеевич', 15, 2021),
+('21мк143', 'Григорьева Ирина Павловна', 16, 2021),
+
+-- 3 курс ИУ (2021)
+('21мк241', 'Дмитриев Максим Андреевич', 17, 2021),
+('21мк242', 'Семенова Татьяна Владимировна', 18, 2021),
+
+-- 3 курс РК (2021)
+('21мк341', 'Светлова Юлия Игоревна', 19, 2021),
+
+-- 4 курс КЗ (2020)
+('20мк161', 'Романов Артур Олегович', 20, 2020);
+
+-- Оценки студентов
+INSERT INTO unik.uspevaemost (student_id, predmet_id, tip_kontrolya_id, ocenka_id, gruppa_id, semestr_number, uchebny_god, data_sdachi) VALUES
+-- 1 курс КЗ-21Б
+(1, 1, 1, 3, 1, 1, '2023-2024', '2024-01-15'),
+(1, 2, 1, 4, 1, 1, '2023-2024', '2024-01-20'),
+(1, 4, 2, 5, 1, 2, '2023-2024', '2024-06-10'),
+(1, 7, 1, 2, 1, 2, '2023-2024', '2024-06-15'),
+
+(2, 1, 1, 1, 1, 1, '2023-2024', '2024-01-15'),
+(2, 2, 1, 2, 1, 1, '2023-2024', '2024-01-20'),
+(2, 4, 2, 5, 1, 2, '2023-2024', '2024-06-10'),
+(2, 7, 1, 1, 1, 2, '2023-2024', '2024-06-15'),
+
+-- 2 курс КЗ-36Б
+(10, 1, 1, 2, 9, 3, '2023-2024', '2024-01-15'),
+(10, 7, 1, 1, 9, 3, '2023-2024', '2024-01-20'),
+(10, 8, 2, 5, 9, 4, '2023-2024', '2024-06-25'),
+(10, 9, 1, 3, 9, 4, '2023-2024', '2024-06-30'),
+
+(11, 1, 1, 1, 9, 3, '2023-2024', '2024-01-15'),
+(11, 7, 1, 2, 9, 3, '2023-2024', '2024-01-20'),
+(11, 8, 2, 5, 9, 4, '2023-2024', '2024-06-25'),
+
+-- 3 курс КЗ-56Б
+(16, 9, 1, 1, 15, 5, '2023-2024', '2024-01-18'),
+(16, 10, 1, 2, 15, 5, '2023-2024', '2024-01-22'),
+(16, 11, 2, 5, 15, 6, '2023-2024', '2024-06-28'),
+(16, 12, 1, 1, 15, 6, '2023-2024', '2024-06-30'),
+
+-- 4 курс КЗ-76Б
+(19, 12, 1, 1, 20, 7, '2023-2024', '2024-01-20'),
+(19, 13, 1, 2, 20, 7, '2023-2024', '2024-01-25'),
+(19, 5, 5, 5, 20, 8, '2023-2024', '2024-06-15'),
+
+-- ИУ студенты
+(4, 14, 1, 2, 3, 1, '2023-2024', '2024-01-15'),
+(4, 15, 1, 1, 3, 1, '2023-2024', '2024-01-20'),
+(13, 14, 1, 3, 11, 3, '2023-2024', '2024-01-15'),
+(13, 16, 1, 2, 11, 3, '2023-2024', '2024-01-25'),
+
+-- РК студенты
+(6, 17, 1, 2, 5, 1, '2023-2024', '2024-01-18'),
+(6, 18, 2, 5, 5, 1, '2023-2024', '2024-01-22'),
+(14, 17, 1, 3, 13, 3, '2023-2024', '2024-01-18'),
+(14, 19, 1, 1, 13, 3, '2023-2024', '2024-01-25'),
+
+-- ФН студент
+(8, 1, 1, 1, 7, 1, '2023-2024', '2024-01-15'),
+(8, 2, 1, 2, 7, 1, '2023-2024', '2024-01-20'),
+
+-- Э студент
+(9, 1, 1, 2, 8, 1, '2023-2024', '2024-01-15'),
+(9, 3, 1, 4, 8, 1, '2023-2024', '2024-01-25');
+
+-- Создаем представление для отображения всех студентов с дефолтными значениями
+CREATE OR REPLACE VIEW unik.vse_studenty_s_ocenkami AS
+SELECT 
+    s.student_id,
+    s.student_name AS "Студент",
+    s.zachotka_number AS "Зачетка",
+    g.gruppa_name AS "Группа",
+    k.kafedra_name AS "Кафедра",
+    s.god_postuplenia AS "Год_поступления",
+    COALESCE(p.predmet_name, 'Нет данных') AS "Предмет",
+    COALESCE(o.ocenka_name, 'Не сдал') AS "Оценка",
+    COALESCE(tk.tip_name, 'Не указан') AS "Тип_контроля",
+    COALESCE(u.uchebny_god, '2023-2024') AS "Учебный_год",
+    COALESCE(u.data_sdachi::text, 'Не сдавал') AS "Дата_сдачи",
+    CASE WHEN u.zapis_id IS NULL THEN 'Нет оценки' ELSE 'Есть оценка' END AS "Статус"
+FROM unik.student s
+JOIN unik.gruppa g ON s.tekushaya_gruppa_id = g.gruppa_id
+JOIN unik.kafedra k ON g.kafedra_id = k.kafedra_id
+LEFT JOIN unik.uspevaemost u ON s.student_id = u.student_id
+LEFT JOIN unik.predmet p ON u.predmet_id = p.predmet_id
+LEFT JOIN unik.ocenka o ON u.ocenka_id = o.ocenka_id
+LEFT JOIN unik.tip_kontrolya tk ON u.tip_kontrolya_id = tk.tip_kontrolya_id;
